@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pesquisa por Palavra-chave</title>
+<style>
+    body { font-family: Arial; margin: 0; padding: 0; background: #f7f7f7; }
+    header { background: #0044cc; color: white; text-align: center; padding: 20px; }
+    .search-container { text-align: center; margin: 20px; }
+    .search-container input { padding: 10px; width: 60%; max-width: 500px; margin-right: 10px; border-radius: 5px; border: 1px solid #ccc; }
+    .search-container button { padding: 10px 20px; background-color: #0044cc; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    .search-container button:hover { background-color: #0033aa; }
+    .results { margin-top: 30px; text-align: center; }
+    .result-item { background: white; padding: 15px; margin: 10px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); width: 60%; max-width: 600px; margin-left: auto; margin-right: auto; }
+    .result-item a { text-decoration: none; color: #0044cc; }
+    .result-item a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<header>
+    <h1>Pesquisa na API de Artigos Científicos</h1>
+</header>
+
+<div class="search-container">
+    <input type="text" id="searchQuery" placeholder="Digite título ou palavra-chave...">
+    <button onclick="searchAPI()">Pesquisar</button>
+</div>
+
+<div class="results" id="resultsContainer"></div>
+
+<script>
+async function searchAPI() {
+    const query = document.getElementById('searchQuery').value.trim().toLowerCase();
+    const resultsContainer = document.getElementById('resultsContainer');
+    resultsContainer.innerHTML = '';
+
+    if (!query) {
+        alert('Por favor, insira um termo de pesquisa!');
+        return;
+    }
+
+    const apiUrl = 'https://sheetdb.io/api/v1/zjcub9as3o06n';
+    
+    try {
+        const response = await fetch(apiUrl);
+        if (!response.ok) throw new Error(`Erro na requisição. Status: ${response.status}`);
+        
+        const data = await response.json();
+        
+        // Filtrar os resultados manualmente por palavra-chave
+        const filtered = data.filter(item => {
+            const title = item.Title ? item.Title.toLowerCase() : '';
+            const link = item.Link ? item.Link.toLowerCase() : '';
+            return title.includes(query) || link.includes(query);
+        });
+
+        if (filtered.length === 0) {
+            resultsContainer.innerHTML = '<p>Nenhum resultado encontrado.</p>';
+            return;
+        }
+
+        // Exibir resultados filtrados
+        filtered.forEach(item => {
+            const resultItem = document.createElement('div');
+            resultItem.className = 'result-item';
+            resultItem.innerHTML = `
+                <h3>${item.Title || 'Título não disponível'}</h3>
+                <a href="${item.Link}" target="_blank">Leia o artigo completo</a>
+            `;
+            resultsContainer.appendChild(resultItem);
+        });
+
+    } catch (error) {
+        console.error('Erro na API:', error);
+        resultsContainer.innerHTML = '<p>Ocorreu um erro ao buscar os dados.</p>';
+    }
+}
+</script>
+
+</body>
+</html>
