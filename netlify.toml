@@ -1,0 +1,10 @@
+[build]
+  # Onde o Netlify deve procurar as Funções (o backend)
+  functions = "netlify/functions"
+  
+  # Onde o Netlify deve procurar os arquivos do site (o frontend)
+  publish = "src" 
+
+[dev]
+  publish = "src"
+  functions = "netlify/functions"
