@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+    <head>
+        
+        <style>
+            *{
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            body{
+                font-family:Arial, Helvetica, sans-serif;
+            }
+            .painel{
+                position: relative;
+            }
+            .painel ul{
+                list-style: none;
+            }
+            .menu{
+                transition: all 0.5s ;
+                padding: 5px;
+                position: relative;
+                display: inline-block;
+            }
+            .painel a{
+                display: block;
+                width: 100%;
+                padding: 10px;
+                color:rgb(255, 255, 255);
+                text-decoration: none;
+            }
+            
+            nav{
+                justify-content: space-between;
+                display: flex;
+                align-items: center;
+                background-color: rgb(51, 51, 77);
+            }
+            #search-icon{
+                background-color: rgb(192, 204, 253);
+                padding: 7px;
+                width: 100%;
+                border-radius: 50%;
+                transition: all 0.5s;
+            }
+            #search-icon:hover{
+                transform: scale(1.15);
+            }
+            .search-container {
+                margin: auto;
+                margin-top: 60px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 10px;
+            }
+            #searchQuery{
+                height: 24px;
+                float: right;
+                width:40vw;
+                text-align: center;
+                border-radius: 7px;
+                border: none;
+                padding: 4px;
+                margin-right: 20px;
+            }
+
+            header{
+                position:relative;
+                justify-items: center;
+                width: 100%;
+                background-size: cover;
+                height: 500px;
+                background-repeat: no-repeat;
+                background-image: url(20173739427440.webp);
+                background-attachment: fixed;
+            }
+            .menu1{
+                display: flex;
+                list-style-type: none;
+                padding: 10px;
+                margin-top: -50px;
+                position: relative;
+                justify-content: center;
+            }
+            .menuses{
+                color: rgb(160, 167, 108);
+                background-color: rgb(255, 255, 255);
+                text-align: center;
+                padding: 06px;
+                border: solid rgb(216, 200, 107) 2px;
+                border-radius: 0px 20px 0px 20px;
+                margin-left:50px;
+                box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.473) ;
+                width: 200px;
+                transition: all 0.3s;
+                position: relative;
+            }
+            .menuses:hover{
+                background-color: rgb(216, 200, 107) ;
+                color: white;
+                cursor: pointer;
+            }
+            .menu::after {
+            content: ""; 
+            position: absolute;
+            left: 0;
+            bottom: 0;
+            width: 0%; 
+            height: 3px;
+            background-color: #dbca34;
+            transition: width 0.5s ease;
+            }
+            .menu:hover::after {
+            width: 100%;
+            }
+            .titulo{
+                color:white;
+            }
+            #caixa1{
+                width: 75%;
+                margin: auto;
+                border-radius: 30px;
+                display: block;
+            }
+            .conteudo1{
+                margin-top: 90px;
+                background-color: rgb(247, 244, 244);
+                padding: 20px;
+                box-shadow: inset 4px 4px 10px rgba(0, 0, 0, 0.205);
+            }
+            .caixa3{
+                position: relative;
+                background-color: rgb(155, 158, 180);
+                color: white;
+                padding: 20px 20px 20px 40px;
+                border-radius: 10px;
+                box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.2);
+                margin: 50px auto;
+                width: 70%;
+            }
+            .caixa3::before {
+                content: "";
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 10px;
+                height: 100%;
+                background-color: rgb(105, 105, 150);
+                border-radius: 10px 0 0 10px;
+        }
+            .caixa4{
+                width: 70%;
+                position: relative;
+                background-color: rgb(203, 196, 218);
+                color: white;
+                padding: 20px 20px 20px 40px;
+                border-radius: 10px;
+                box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.2);
+                margin: auto;
+                padding-right: 50px;
+            }
+            .caixa4::after {
+                content: "";
+                position: absolute;
+                top: 0;
+                left: 99.3%;
+                width: 10px;
+                height: 100%;
+                background-color: rgb(170, 119, 170);
+                border-radius: 0px 10px 10px 0px;
+        }
+            .caixa5{
+                width: 70%;
+                position: relative;
+                background-color: rgb(184, 206, 203);
+                color: white;
+                padding: 20px 20px 20px 40px;
+                border-radius: 10px;
+                box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.2);
+                margin: 50px auto;
+            }
+            .caixa5::before {
+                content: "";
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 10px ;
+                height: 100%;
+                background-color: rgb(105, 148, 150);
+                border-radius: 10px 0 0 10px;
+        }
+            .caixa6{
+                width: 50%;
+                position: relative;
+                background-color: rgb(255, 255, 255);
+                color: rgb(0, 0, 0);
+                padding: 20px 20px 20px 40px;
+                border-radius: 10px;
+                box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.2);
+                margin: 50px auto;
+             }
+             .caixa6::before {
+                content: "";
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 10px;
+                height: 100%;
+                background-color: rgb(105, 148, 150);
+                border-radius: 10px 0 0 10px;
+            }
+            
+            .butao{
+                border-radius: 50%;
+                border: none;
+                cursor: pointer;
+            }
+            .butao:active .caixa{
+                display: none;
+                opacity: 0;
+            }
+            .results { 
+                margin-top: 30px; 
+                text-align: center;
+            }
+            .caixa6 a { 
+                text-decoration: none; 
+                border-radius: 10px;
+                padding: 7px;
+                color: rgb(0, 0, 0);
+                box-shadow: 2px 2px 7px rgba(0, 0, 0, 0.329);
+                margin-top: 10px;
+                transition: all 0.5s;
+            }
+            .caixa6 a:hover{
+                box-shadow: 2px 2px 7px rgba(0, 0, 0, 0.137);
+            }
+
+        </style>
+    </head>
+    <body>
+        <nav>
+            <div class="painel">
+            <ul>
+                <li class="menu"><a href="grupo.html">Quem somos</a></li>
+            </ul>
+        </div>
+                
+        </nav>
+        <header>
+        </header>
+        <section>
+            <div class="men">
+            <ul class="menu1">
+                <li class="menuses">
+                    <h3>menuses</h3>
+                    <div>
+                        Lorem ipsum dolor sit amet consectetur 
+                        adipisicing elit. Molestias praesentium
+                         inventore facere optio 
+                    </div>
+                    </li>
+                <li class="menuses">
+                    <h3>menuses</h3>
+                    <div>
+                        Lorem ipsum dolor sit amet consectetur 
+                        adipisicing elit. Molestias praesentium
+                         inventore facere optio 
+                    </div>
+                    </li><li class="menuses">
+                    <h3>menuses</h3>
+                    <div>
+                        Lorem ipsum dolor sit amet consectetur 
+                        adipisicing elit. Molestias praesentium
+                         inventore facere optio 
+                    </div>
+                    </li><li class="menuses">
+                    <h3>menuses</h3>
+                    <div>
+                        Lorem ipsum dolor sit amet consectetur 
+                        adipisicing elit. Molestias praesentium
+                         inventore facere optio 
+                    </div>
+                    </li>
+                
+            </ul>
+            </div>
+                <div class="search-container">
+                <input type="text" id="searchQuery" placeholder="Digite título ou palavra-chave...">
+                <button onclick="searchAPI()" class="butao"><img src="search.svg" id="search-icon" onclick="aperta()"></button>
+                </div>
+                <script>
+            let debounceTimer;
+
+            async function searchAPI() {
+                const query = document.getElementById('searchQuery').value.trim().toLowerCase();
+                const resultsContainer = document.getElementById('resultsContainer');
+                resultsContainer.innerHTML = '';
+                
+                if (!query) {
+                    resultsContainer.innerHTML = '<p>Por favor, insira um termo de pesquisa!</p>';
+                    return;
+                }
+
+                const apiUrl = 'https://sheetdb.io/api/v1/zjcub9as3o06n';
+
+                try {
+                    const response = await fetch(apiUrl);
+                    if (!response.ok) throw new Error(`Erro na requisição. Status: ${response.status}`);
+                    
+                    const data = await response.json();
+
+                    const filtered = data.filter(item => {
+                        const title = item.Title ? item.Title.toLowerCase() : '';
+                        const link = item.Link ? item.Link.toLowerCase() : '';
+                        return title.includes(query) || link.includes(query);
+                    });
+
+                    if (filtered.length === 0) {
+                        resultsContainer.innerHTML = '<p>Nenhum resultado encontrado.</p>';
+                        return;
+                    }
+
+                    filtered.forEach(item => {
+                        const resultItem = document.createElement('div');
+                        resultItem.className = 'caixa6';
+                        resultItem.innerHTML = `
+                            <h3>${item.Title || 'Título não disponível'}</h3><br>
+                            <a href="${item.Link}" target="_blank">Leia o artigo completo</a>
+                        `;
+                        resultsContainer.appendChild(resultItem);
+                    });
+
+                } catch (error) {
+                    console.error('Erro na API:', error);
+                    resultsContainer.innerHTML = '<p>Ocorreu um erro ao buscar os dados.</p>';
+                }
+            }
+
+            function debounceSearch() {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(searchAPI, 500); 
+            }
+
+            document.getElementById('searchQuery').addEventListener('input', debounceSearch);
+        </script>
+        </script>
+        </section>
+        
+        <div class="conteudo1">
+        <div class="results" id="resultsContainer"></div>
+            <div id="caixa1">
+                
+                <div class="caixa3">
+                    <h2 class="tit">Pesquisa</h2>
+                    <p>
+                        Pesquise palavras-chave para encontrar
+                        artigos relacionados a sua pesquisa
+                    </p>
+            </div>
+            <div class="caixa4">
+                    <h2 class="tit">Organização</h2>
+                    <p>
+                       Organizamos os dados a partir da criação de
+                       uma API que organiza os arquivos disponiblizados 
+                       pela Nasa 
+                    </p>
+            </div>
+            <div class="caixa5">
+                    <h2 class="tit">lorem</h2>
+                    <p>
+                        Lorem ipsum dolor sit amet consectetur
+                         adipisicing elit. Dolores sint ut quae 
+                         quod recusandae magnam delectus illum rem 
+                         blanditiis aperiam voluptates voluptatem 
+                         ratione cumque veniam consequatur non,
+                         vitae consectetur. Asperiores.
+                    </p>
+            </div>
+        </div>
+        <footer></footer>
+        
+    </body>
+</html>
