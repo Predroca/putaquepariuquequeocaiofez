@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa de Pesquisas Espaciais Interativo (NASA Style)</title>
+    <!-- Carregando Tailwind CSS para estilização -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Carregando D3.js para o grafo de força e interatividade -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9; /* Slate-100 para um fundo suave */
+        }
+        /* Estilização para os nós D3 */
+        .node circle {
+            stroke: #fff;
+            stroke-width: 2px;
+            transition: all 0.3s ease-in-out;
+            cursor: pointer;
+            r: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Sombra suave para 3D effect */
+        }
+        /* Efeito de hover e clique para o D3 */
+        .node:hover circle, .node.active circle {
+            stroke-width: 4px;
+        }
+        .node.active circle {
+            /* Cor Vermelha, conforme solicitado */
+            stroke: #ef4444;
+        }
+        /* Esconde nós filtrados sem transição para evitar glitches */
+        .node.hidden {
+            display: none !important;
+        }
+        #visualization {
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+
+<div class="max-w-7xl mx-auto flex flex-col lg:flex-row h-[90vh] space-y-6 lg:space-y-0 lg:space-x-6">
+
+    <!-- Coluna Esquerda: Mapa de Visualização -->
+    <div class="flex-grow bg-white shadow-2xl rounded-xl p-4 lg:p-6 border border-gray-200 overflow-hidden flex flex-col">
+        <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900 mb-2 text-center">
+            Mapa Agrupado de Pesquisas Científicas
+        </h1>
+        <p class="text-center text-gray-500 mb-4 text-sm">
+            Visualização de Artigos Agrupados por Área de Estudo
+        </p>
+
+        <!-- Campo de Pesquisa & Filtro (Wrapper com relative e z-20 para o dropdown absoluto) -->
+        <div class="mb-4 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 relative z-20">
+            <input
+                type="text"
+                id="searchInput"
+                placeholder="Pesquisar por Título, ID ou Palavra-chave..."
+                class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150">
+
+            <!-- Contêiner de Resultados da Pesquisa (Posicionado Absolutamente) -->
+            <div id="searchResults" class="absolute top-full left-0 right-0 p-2 max-h-48 overflow-y-auto bg-white shadow-lg rounded-b-xl border border-t-0 border-gray-300 z-20 hidden"></div>
+
+            <select id="categoryFilter"
+                class="p-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 w-full sm:w-auto min-w-[10rem]">
+                <option value="">Todas as Categorias</option>
+                <!-- Options serão preenchidas via JS -->
+            </select>
+        </div>
+
+        <p class="text-center text-gray-500 mb-4 text-xs">
+            Nós (círculos) são agrupados por área de estudo. **Clique e arraste** para mover o mapa (Pan) e use o scroll para zoom.
+        </p>
+
+        <!-- Contêiner de Loading -->
+        <div id="loading" class="text-center text-indigo-600 font-semibold p-10 hidden">
+            <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-indigo-600 inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Carregando dados e organizando os clusters...
+        </div>
+
+        <!-- Contêiner da Legenda -->
+        <div id="legendContainer" class="p-2 border-b border-gray-100 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs sm:text-sm"></div>
+
+        <!-- Contêiner do SVG D3.js -->
+        <div id="visualization" class="w-full h-full min-h-[50vh] lg:min-h-full">
+            <svg id="researchMap" class="w-full h-full cursor-move"></svg>
+        </div>
+    </div>
+
+    <!-- Coluna Direita: Detalhes do Artigo (Painel Interativo) -->
+    <div id="sidebar" class="w-full lg:w-96 bg-white shadow-2xl rounded-xl p-6 border border-gray-200 flex-shrink-0 lg:overflow-y-auto">
+        <h2 id="sidebarTitle" class="text-2xl font-bold text-indigo-700 mb-4 border-b pb-2">Detalhes da Pesquisa</h2>
+        <div id="detailsContent" class="space-y-4">
+            <!-- Conteúdo inicial simples, como solicitado -->
+            <p class="text-gray-500 italic">
+                Clique em qualquer nó no mapa ou em um resultado de pesquisa para ver detalhes.
+            </p>
+        </div>
+        <div id="articleActions" class="mt-8 pt-4 border-t hidden">
+            <a id="articleLink" href="#" target="_blank"
+                class="w-full inline-flex justify-center items-center px-4 py-3 border border-transparent text-sm font-medium rounded-lg shadow-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                Acessar Fonte Original (PubMed)
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+    // URL da API Local (Simulado)
+    const API_URL = "SUA_API_LOCAL_AQUI";
+
+    // Dados brutos (simulando a resposta JSON da API)
+    const rawApiData = [
+        { "Title": "Mice in Bion-M 1 space mission: training and selection", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4136787/" },
+        { "Title": "Microgravity induces pelvic bone loss through osteoclastic activity, osteocytic osteolysis, and osteoblastic cell cycle inhibition by CDKN1a/p21", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3630201/" },
+        { "Title": "Stem Cell Health and Tissue Regeneration in Microgravity", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC11988870/" },
+        { "Title": "Microgravity Reduces the Differentiation and Regenerative Potential of Embryonic Stem Cells", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7998608/" },
+        { "Title": "Microgravity validation of a novel system for RNA isolation and multiplex quantitative real time PCR analysis of gene expression on the International Space Station", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5587110/" },
+        { "Title": "Spaceflight Modulates the Expression of Key Oxidative Stress and Cell Cycle Related Genes in Heart", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8396460/" },
+        { "Title": "Dose- and Ion-Dependent Effects in the Oxidative Stress Response to Space-Like Radiation Exposure in the Skeletal System", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5666799/" },
+        { "Title": "From the bench to exploration medicine: NASA life sciences translational research for human exploration and habitation missions.", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5460236/" },
+        { "Title": "High-precision method for cyclic loading of small-animal vertebrae to assess bone quality.", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6222041/" },
+        { "Title": "Effects of ex vivo ionizing radiation on collagen structure and whole-bone mechanical properties of mouse vertebrae.", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6813909/" },
+        { "Title": "Absence of gamma-sarcoglycan alters the response of p70S6 kinase to mechanical perturbation in murine skeletal muscle", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4095884/" },
+        { "Title": "AtRabD2b and AtRabD2c have overlapping functions in pollen development and pollen tube growth.", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3040128/" },
+        { "Title": "TNO1 is involved in salt tolerance and vacuolar trafficking in Arabidopsis.", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3177255/" },
+        { "Title": "Functional redundancy between trans-Golgi network SNARE family members in Arabidopsis thaliana.", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC11500582/" },
+        { "Title": "Root growth movements: Waving and skewing.", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5387210/" },
+        { "Title": "Gravitropism and lateral root emergence are dependent on the trans-Golgi network protein TNO1", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4642138/" },
+        { "Title": "TNO1, a TGN-localized SNARE-interacting protein, modulates root skewing in Arabidopsis thaliana.", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5387210/" },
+        { "Title": "The Drosophila SUN protein Spag4 cooperates with the coiled-coil protein Yuri Gagarin to maintain association of the basal body and spermatid nucleus.", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2915878/" },
+        { "Title": "Toll mediated infection response is altered by gravity and spaceflight in Drosophila", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3901686/" },
+        { "Title": "Multi-omics analysis of multiple missions to space reveal a theme of lipid dysregulation in mouse liver", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6985101/" },
+        { "Title": "GeneLab database analyses suggest long-term impact of space radiation on the cardiovascular system by the activation of FYN through reactive oxygen species.", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6387434/" },
+        { "Title": "FAIRness and usability for open-access omics data systems.", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6371294/" },
+        { "Title": "NASA GeneLab platform utilized for biological response to space radiation in animal models", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7072278/" },
+        { "Title": "Circulating miRNA spaceflight signature reveals targets for countermeasure development", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8441986/" },
+        { "Title": "Machine learning algorithm to characterize antimicrobial resistance associated with the International Space Station surface microbiome", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9400218/" },
+        { "Title": "Extraterrestrial Gynecology: Could Spaceflight Increase the Risk of Developing Cancer in Female Astronauts? An Updated Review", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9267413/" },
+        { "Title": "Muscle atrophy phenotype gene expression during spaceflight is linked to a metabolic crosstalk in both the liver and the muscle in mice.", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9576569/" },
+        { "Title": "Chromosomal positioning and epigenetic architecture influence DNA methylation patterns triggered by galactic cosmic radiation", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10789781/" },
+        { "Title": "A comprehensive SARS-CoV-2 and COVID-19 review, Part 2: Host extracellular to systemic effects of SARS-CoV-2 infection", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10772081/" },
+        { "Title": "Aging and putative frailty biomarkers are altered by spaceflight", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC11166946/" },
+        { "Title": "Space radiation damage rescued by inhibition of key spaceflight associated miRNAs", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC11166944/" },
+        { "Title": "Ethical considerations for the age of non-governmental space exploration", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC11166968/" },
+        { "Title": "Innate immune responses of Drosophila melanogaster are altered by spaceflight.", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7000411/" },
+        { "Title": "Prolonged Exposure to Microgravity Reduces Cardiac Contractility and Initiates Remodeling in Drosophila", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7787258/" },
+        { "Title": "Regulation of plant gravity sensing and signaling by the actin cytoskeleton.", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8716943/" },
+        { "Title": "HLB1 Is a Tetratricopeptide Repeat Domain-Containing Protein That Operates at the Intersection of the Exocytic and Endocytic Pathways at the TGN/EE in Arabidopsis", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4826010/" },
+        { "Title": "ERULUS is a plasma membrane-localized receptor-like kinase that specifies root hair growth by maintaining tip-focused cytoplasmic calcium oscillations.", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6048781/" },
+        { "Title": "Brassinosteroids inhibit autotropic root straightening by modifying filamentous-actin organization and dynamics.", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7010715/" },
+        { "Title": "Cell type-specific imaging of calcium signaling in Arabidopsis thaliana seedling roots using GCaMP3.", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7503278/" },
+        { "Title": "Spatial and temporal localization of SPIRRIG and WAVE/SCAR reveal roles for these proteins in actin-mediated root hair development.", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8364238/" },
+        { "Title": "Microgravity Stress: Bone and Connective Tissue", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC11579474/" },
+        { "Title": "S. aureus MscL is a pentamer in vivo but of variable stoichiometries in vitro: implications for detergent-solubilized membrane proteins", "Link": "https://www.ncbi.nlm.nihs.gov/pmc/articles/PMC2998437/" },
+        { "Title": "Manipulating the permeation of charged compounds through the MscL nanovalve.", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3005423/" },
+        { "Title": "The oligomeric state of the truncated mechanosensitive channel of large conductance shows no variance in vivo.", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3190158/" },
+        { "Title": "Three routes to modulate the pore size of the MscL channel/nanovalve", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3289768/" },
+        { "Title": "The dynamics of protein-protein interactions between domains of MscL at the cytoplasmic-lipid interface", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3508904/" },
+        { "Title": "The MscS and MscL families of mechanosensitive channels act as microbial emergency release valves", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3430326/" },
+        { "Title": "Chimeras reveal a single lipid-interface residue that controls MscL channel kinetics as well as mechanosensitivity", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3593973/" },
+        { "Title": "Evidence for extensive horizontal gene transfer from the draft genome of a tardigrade", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5018776/" },
+        { "Title": "Reply to Bemm et al. and Arakawa: Identifying foreign genes in independent Hypsibius dujardini genome assemblies", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4896697/" },
+        { "Title": "Tardigrades Use Intrinsically Disordered Proteins to Survive Desiccation.", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC11127935/" },
+        { "Title": "Desiccation of Hypsibius exemplaris", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC11831363/" },
+        { "Title": "The biology of tardigrade disordered proteins in extreme stress tolerance.", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC11930778/" },
+        { "Title": "Production of reactive oxygen species and involvement of bioprotectants during anhydrobiosis in the tardigrade Paramacrobiotus spatialis", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8816950/" },
+        { "Title": "Partial weight suspension: A novel murine model for investigating adaptation to reduced musculoskeletal loading.", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3774184/" },
+        { "Title": "Partial reductions in mechanical loading yield proportional changes in bone density, bone architecture, and muscle mass", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4118556/" },
+        { "Title": "Spaceflight and hind limb unloading induce similar changes in electrical impedance characteristics of mouse gastrocnemius muscle", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4653813/" },
+        { "Title": "Spaceflight Activates Lipotoxic Pathways in Mouse Liver", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6915713/" },
+        { "Title": "Treatment with a soluble bone morphogenetic protein type 1A receptor (BMPR1A) fusion protein increases bone mass and bone formation in mice subjected to hindlimb unloading.", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6124165/" },
+        { "Title": "RNAseq and RNA molecular barcoding reveal differential gene expression in cortical bone following hindlimb unloading in female mice", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8509868/" },
+        { "Title": "Proteomic and phosphoproteomic characterization of cardiovascular tissues after long term exposure to simulated space radiation", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC11063234/" },
+        { "Title": "Adaptive Changes in the Vestibular System of Land Snail to a 30-Day Spaceflight and Readaptation on Return to Earth", "Link": "https://www.ncbi.nlm.nihs.gov/pmc/articles/PMC5672023/" },
+        { "Title": "Morphology of the Utricular Otolith Organ in the Toadfish, Opsanus tau", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5899691/" },
+        { "Title": "Influence of Magnitude and Duration of Altered Gravity and Readaptation to 1g on the Structure and Function of the Utricle in Toadfish, Opsanus tau.", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6204554/" },
+        { "Title": "Organization of the ER-Golgi interface for membrane traffic control.", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4064004/" },
+        { "Title": "IRE1: ER stress sensor and cell fate executor.", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3818365/" },
+        { "Title": "Inter-regulation of the unfolded protein response and auxin signaling.", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3981873/" },
+        { "Title": "Endoplasmic reticulum-shape and function in stress translation", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4150462/" },
+        { "Title": "Galactose-depleted xycoglucan is dysfunctional and leads to dwarfism in Arabidopsis", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4378170/" },
+        { "Title": "Unfolded protein response in plants: one master, many questions.", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4618186/" },
+        { "Title": "Vesicles versus Tubes: Is Endoplasmic Reticulum-Golgi Transport in Plants Fundamentally Different from Other Eukaryotes?", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4453782/" },
+        { "Title": "Pectin methylesterification impacts the relationship between photosynthesis and plant growth.", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4902601/" },
+        { "Title": "Reduced Chloroplast Coverage genes from Arabidopsis thaliana help to establish the size of the chloroplast compartment", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4776492/" },
+        { "Title": "Maintaining the factory: The roles of the unfolded protein response in cellular homeostasis in plants.", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5415411/" },
+        { "Title": "NADPH oxidase activity is required for ER stress survival in plants.", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6289879/" },
+        { "Title": "Relevance of the Unfolded Protein Response to Spaceflight-Induced Transcriptional Reprogramming in Arabidopsis", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7987364/" },
+        { "Title": "Reanalysis of the Mars500 experiment reveals common gut microbiome alterations in astronauts induced by long-duration confinement", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8099722/" },
+        { "Title": "High atomic weight, high-energy radiation (HZE) induces transcriptional responses shared with conventional stresses in addition to a core \"DSB\" response specific to clastogenic treatments", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5116466/" },
+        { "Title": "Genomic stability in response to high-charge, high-energy (HZE) radiation requires ATM/ATR signaling", "Link": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5722484/" }
+    ];
+
+    // Variáveis de Configuração D3 e DOM
+    const svg = d3.select("#researchMap");
+    const width = 1000;
+    const height = 1000;
+    let nodes, simulation, nodeGroup, colorScale, categories;
+    let allArticlesData = [];
+    let zoomBehavior;
+
+    // Elementos DOM
+    const detailsContent = document.getElementById('detailsContent');
+    const articleActions = document.getElementById('articleActions');
+    const articleLink = document.getElementById('articleLink');
+    const searchInput = document.getElementById('searchInput');
+    const categoryFilter = document.getElementById('categoryFilter');
+    const loadingElement = document.getElementById('loading');
+    const legendContainer = document.getElementById('legendContainer');
+    const searchResultsContainer = document.getElementById('searchResults');
+
+    // Define as coordenadas alvo para cada categoria para criar os clusters estáticos
+    const categoryPositions = {
+        "Astrobotânica": { x: 200, y: 200 },
+        "Musculoesquelético": { x: 500, y: 200 },
+        "Biologia da Radiação": { x: 800, y: 200 },
+        "Omics & Dados": { x: 200, y: 400 },
+        "Extremófilos & Biofísica": { x: 500, y: 400 },
+        "Fisiologia/Voo Espacial": { x: 800, y: 400 },
+        "Imunologia & Microbioma": { x: 200, y: 600 },
+        "Cardiovascular": { x: 500, y: 600 },
+        "Neurovestibular": { x: 800, y: 600 },
+        "Biologia Celular": { x: 500, y: 800 },
+        "Geral / Outros": { x: 800, y: 800 }
+    };
+
+    const viewBox = svg.attr("viewBox", `0 0 ${width} ${height}`).attr("preserveAspectRatio", "xMidYMid meet");
+
+    // O elemento <g> onde todos os elementos do mapa serão transformados (para pan/zoom)
+    const g = svg.append("g");
+
+    /**
+     * UTILS: Função de Debounce (melhora o desempenho da pesquisa)
+     */
+    function debounce(func, delay) {
+        let timeoutId;
+        return function(...args) {
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => func.apply(this, args), delay);
+        };
+    }
+
+    /**
+     * Funções de Zoom e Pan (Panning)
+     */
+    function zoomed(event) {
+        // Aplica a transformação de pan e zoom ao grupo principal G
+        g.attr("transform", event.transform);
+    }
+
+    function setupZoom() {
+        // Cria o comportamento de zoom
+        zoomBehavior = d3.zoom()
+            .scaleExtent([0.5, 4]) // Limita o zoom de 50% a 400%
+            .on("zoom", zoomed); // Chama a função 'zoomed' ao mover ou dar zoom
+
+        // Aplica o comportamento ao SVG
+        svg.call(zoomBehavior);
+    }
+
+    /**
+     * Lógica de Categorização (Mecanismo aprimorado para "melhore a pesquisa")
+     */
+    function categorizeData(data) {
+        const categorizedData = [];
+        // Palavras-chave aprimoradas para categorização mais precisa
+        const keywords = {
+            "Astrobotânica": ["plant", "root", "arabidopsis", "xyloglucan", "chloroplast", "gravitropism", "tno1", "erulus", "brassinosteroids"],
+            "Musculoesquelético": ["bone", "muscle", "skeletal", "osteoclast", "vertebrae", "sarcoglycan", "loading"],
+            "Biologia da Radiação": ["radiation", "hze", "dna", "transcriptional", "genomic", "atm/atr", "cosmic", "miRNA"],
+            "Omics & Dados": ["omics", "genelab", "rna", "pcr", "fairness", "proteomic", "machine learning"],
+            "Extremófilos & Biofísica": ["tardigrade", "mscl", "mechanosensitive", "desiccation", "nanovalve", "anhydrobiosis", "stoichiometries"],
+            "Fisiologia/Voo Espacial": ["microgravity", "spaceflight", "iss", "bion-m", "astronauts", "aging", "frailty", "confinement", "mars500", "metabolic"],
+            "Imunologia & Microbioma": ["immune", "infection", "toll", "drosophila", "microbiome", "sars-cov-2", "antimicrobial"],
+            "Cardiovascular": ["heart", "cardiovascular", "fyn"],
+            "Neurovestibular": ["vestibular", "otolith", "snail", "toadfish", "gravity sensing"],
+            "Biologia Celular": ["Stem Cell", "Regeneration", "Golgi", "ER", "SNARE", "Unfolded protein response", "HLB1", "IRE1", "vesicles"]
+        };
+
+        data.forEach((item, index) => {
+            let category = "Geral / Outros";
+            const titleLower = item.Title.toLowerCase();
+
+            for (const cat in keywords) {
+                if (keywords[cat].some(keyword => titleLower.includes(keyword.toLowerCase()))) {
+                    category = cat;
+                    break;
+                }
+            }
+
+            categorizedData.push({
+                id: `A-${(index + 1).toString().padStart(3, '0')}`,
+                title: item.Title,
+                link: item.Link,
+                category: category,
+                // Adiciona as posições alvo para a simulação de força
+                targetX: categoryPositions[category] ? categoryPositions[category].x : categoryPositions["Geral / Outros"].x,
+                targetY: categoryPositions[category] ? categoryPositions[category].y : categoryPositions["Geral / Outros"].y,
+                x: 0,
+                y: 0,
+                radius: 15
+            });
+        });
+
+        return categorizedData;
+    }
+
+    /**
+     * Simula a chamada assíncrona à API (usando dados estáticos)
+     */
+    async function fetchData() {
+        loadingElement.classList.remove('hidden');
+        await new Promise(resolve => setTimeout(resolve, 800));
+        allArticlesData = categorizeData(rawApiData);
+        loadingElement.classList.add('hidden');
+        return allArticlesData;
+    }
+
+    /**
+     * Atualiza a legenda de cores e o filtro de categorias
+     */
+    function renderLegendAndFilter() {
+        categories = [...new Set(allArticlesData.map(n => n.category))].sort();
+        colorScale = d3.scaleOrdinal(d3.schemeCategory10).domain(categories);
+
+        // 1. Renderiza a Legenda
+        d3.select("#legendContainer").html('');
+        const legendItems = d3.select("#legendContainer").selectAll("div")
+            .data(categories)
+            .enter().append("div")
+            .attr("class", "flex items-center space-x-1 px-2 py-1 rounded-full bg-gray-50 border border-gray-200 cursor-pointer hover:bg-indigo-100 transition duration-150")
+            .on('click', function(event, d) {
+                // Ao clicar na legenda, filtra o mapa E centraliza no cluster
+                categoryFilter.value = d;
+                updateVisualization();
+            });
+
+        legendItems.append("span")
+            .style("background-color", d => colorScale(d))
+            .attr("class", "w-3 h-3 rounded-full flex-shrink-0 shadow-md");
+
+        legendItems.append("span")
+            .text(d => d)
+            .attr("class", "text-gray-700 truncate font-medium");
+
+        // 2. Popula o Dropdown de Filtro
+        categoryFilter.innerHTML = '<option value="">Todas as Categorias</option>';
+        categories.forEach(cat => {
+            const option = document.createElement('option');
+            option.value = cat;
+            option.textContent = cat;
+            categoryFilter.appendChild(option);
+        });
+    }
+
+    // Funções de Drag and Drop (Para nós individuais)
+    function dragStarted(event, d) {
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+    }
+
+    function dragged(event, d) {
+        d.fx = event.x;
+        d.fy = event.y;
+    }
+
+    function dragEnded(event, d) {
+        if (!event.active) simulation.alphaTarget(0);
+        d.fx = null;
+        d.fy = null;
+    }
+
+    /**
+     * Inicializa/Atualiza o grafo de força D3.js com dados filtrados.
+     */
+    function renderGraph(dataToDisplay) {
+        // Remove destaques anteriores no D3
+        g.selectAll(".node").classed("active", false);
+
+        // 1. Configuração dos Nós
+        nodes = dataToDisplay;
+
+        // Limpa o grafo anterior
+        g.selectAll("*").remove();
+
+        // 2. Configura a Simulação de Força
+        simulation = d3.forceSimulation(nodes)
+            .force("charge", d3.forceManyBody().strength(-20))
+            .force("x", d3.forceX(d => d.targetX).strength(0.3))
+            .force("y", d3.forceY(d => d.targetY).strength(0.3))
+            .force("collision", d3.forceCollide().radius(d => d.radius + 6));
+
+        // 3. Desenho do Grafo (Nós)
+        nodeGroup = g.append("g")
+            .attr("class", "nodes")
+            .selectAll("g")
+            .data(nodes, d => d.id)
+            .enter().append("g")
+            .attr("class", "node")
+            .call(d3.drag()
+                .on("start", dragStarted)
+                .on("drag", dragged)
+                .on("end", dragEnded))
+            .on("mouseover", function(event, d) {
+                const isSelected = d3.select(this).classed("active");
+                if (!isSelected) {
+                    d3.select(this).select("circle")
+                        .transition().duration(150)
+                        .attr("r", 20);
+                }
+            })
+            .on("mouseout", function(event, d) {
+                const isSelected = d3.select(this).classed("active");
+                d3.select(this).select("circle")
+                    .transition().duration(150)
+                    .attr("r", isSelected ? 20 : 15);
+            });
+
+        // Adiciona o Círculo
+        nodeGroup.append("circle")
+            .attr("r", d => d.radius)
+            .attr("fill", d => colorScale(d.category))
+            // Chama centerAndSelectNode para centralizar e mostrar detalhes no clique do mapa
+            // Passa o ID para garantir que a centralização encontre os dados corretos no array nodes
+            .on("click", (event, d) => centerAndSelectNode(d.id));
+
+        // Adiciona um título visível ao passar o mouse (Tooltip nativo)
+        nodeGroup.append("title").text(d => `${d.id}: ${d.title} (${d.category})`);
+
+        // 4. Funções de Simulação
+        simulation.on("tick", () => {
+            // Aplica restrições de limites diretamente às coordenadas do nó
+            nodes.forEach(d => {
+                // Força o nó a ficar dentro da área visível (com margem de 15px)
+                d.x = Math.max(15, Math.min(width - 15, d.x));
+                d.y = Math.max(15, Math.min(height - 15, d.y));
+            });
+
+            // Aplica a transformação de posição ao grupo do nó (usando os valores limitados)
+            nodeGroup.attr("transform", d => `translate(${d.x},${d.y})`);
+        });
+
+        // Garante que a simulação corra e pare rapidamente para fixar os clusters
+        simulation.alpha(1).restart();
+        setTimeout(() => {
+            simulation.stop();
+            simulation.alphaTarget(0);
+        }, 1200);
+    }
+
+    /**
+     * Move a visualização para centralizar e seleciona um nó
+     */
+    function centerAndSelectNode(articleId) {
+        // Usa o array 'nodes' que está atualmente ligado ao D3 e tem as coordenadas atualizadas
+        const articleData = nodes.find(d => d.id === articleId);
+
+        if (!articleData) return;
+
+        // 1. Atualiza o painel de detalhes e destaca o nó no mapa
+        showDetails(articleData);
+
+        // 2. Anima a visualização para centralizar e dar zoom
+        const [x, y] = [articleData.x, articleData.y];
+
+        const transition = svg.transition().duration(750);
+        const targetScale = 1.8;
+
+        // CORREÇÃO DE CENTRALIZAÇÃO DO NÓ INDIVIDUAL: Valor ajustado para -290, conforme solicitado.
+        const y_correction = -290;
+
+        // Calcula a nova transformação para centralizar o nó selecionado (usando x e y precisos)
+        const newTransform = d3.zoomIdentity
+            .translate(width / 2, height / 2 + y_correction)
+            .scale(targetScale)
+            .translate(-x, -y);
+
+        svg.transition(transition).call(zoomBehavior.transform, newTransform);
+    }
+
+    /**
+     * Centraliza o mapa no centro geográfico do cluster de uma categoria.
+     */
+    function centerOnCategory(category) {
+        if (!category || category === "") {
+            // Se "Todas as Categorias" for selecionada, reseta o zoom para ver o mapa inteiro.
+            svg.transition().duration(750).call(zoomBehavior.transform, d3.zoomIdentity);
+            return;
+        }
+
+        // Usa as posições alvo pré-definidas para o centro do cluster
+        const targetPosition = categoryPositions[category];
+        if (!targetPosition) return;
+
+        const transition = svg.transition().duration(750);
+        const targetScale = 1.2; // Zoom leve no cluster
+
+        // Usa as coordenadas alvo pré-calculadas
+        const [x, y] = [targetPosition.x, targetPosition.y];
+
+        // CORREÇÃO DE CENTRALIZAÇÃO DO CLUSTER: Aplicando a correção de -290, conforme solicitado.
+        const y_correction = -290;
+
+        const newTransform = d3.zoomIdentity
+            .translate(width / 2, height / 2 + y_correction)
+            .scale(targetScale)
+            .translate(-x, -y);
+
+        svg.transition(transition).call(zoomBehavior.transform, newTransform);
+    }
+
+
+    /**
+     * Atualiza o painel de detalhes e destaca o nó selecionado (sem animar a vista).
+     */
+    function showDetails(d) {
+        // 1. Destaque do Nó no Mapa
+        // Remove a classe "active" e redimensiona todos os círculos de volta para 15
+        g.selectAll(".node").classed("active", false);
+        g.selectAll(".node circle").attr("r", 15);
+
+        // Encontra o nó específico usando o ID para aplicar a classe ativa e o raio
+        // Garantimos que a seleção funcione corretamente no DOM para aplicar os estilos.
+        g.selectAll(".node")
+            .filter(n => n.id === d.id)
+            .classed("active", true)
+            .select("circle")
+            .attr("r", 20);
+
+        // 2. Atualiza o Painel Lateral
+        detailsContent.innerHTML = `
+            <div class="text-sm font-semibold text-gray-400 mb-2">ID da Pesquisa: <span class="text-indigo-600">${d.id}</span></div>
+            <h3 class="text-xl font-bold text-gray-800">${d.title}</h3>
+            <div class="mt-3">
+                <span class="font-medium text-gray-600">Categoria:</span>
+                <span class="px-3 py-1 text-sm font-semibold rounded-full text-white inline-block"
+                      style="background-color: ${colorScale(d.category)}">
+                    ${d.category}
+                </span>
+            </div>
+            <p class="text-gray-700 mt-4 italic">
+                Este artigo faz parte da área de **${d.category}** e explora temas relacionados à vida no espaço.
+            </p>
+        `;
+
+        articleLink.href = d.link;
+        articleActions.classList.remove('hidden');
+    }
+
+    /**
+     * Aplica o filtro de texto e o filtro de categoria e chama a renderização do grafo.
+     */
+    function updateVisualization() {
+        const query = searchInput.value.trim().toLowerCase();
+        const selectedCategory = categoryFilter.value;
+
+        let filteredData = allArticlesData;
+
+        // 1. Filtrar por Categoria
+        if (selectedCategory) {
+            filteredData = filteredData.filter(d => d.category === selectedCategory);
+        }
+
+        // 2. Filtrar por Pesquisa de Texto
+        if (query.length >= 2) {
+            filteredData = filteredData.filter(d =>
+                d.title.toLowerCase().includes(query) ||
+                d.id.toLowerCase().includes(query) ||
+                d.category.toLowerCase().includes(query)
+            );
+        }
+
+        // Re-renderiza o grafo apenas com os nós filtrados (Melhoria na pesquisa: filtro dinâmico do mapa)
+        renderGraph(filteredData);
+
+        // Centraliza no cluster se o filtro de categoria foi alterado e a pesquisa de texto está vazia
+        // Se a pesquisa de texto está ativa, ela sobrepõe a centralização de categoria.
+        if (query.length < 2) {
+            centerOnCategory(selectedCategory);
+        } else if (query.length === 0 && selectedCategory === "") {
+            // Se tudo está limpo, reseta o zoom
+             svg.transition().duration(750).call(zoomBehavior.transform, d3.zoomIdentity);
+        }
+    }
+
+
+    /**
+     * Lógica de Pesquisa de Autocomplete (Melhoria na pesquisa: resultados visuais)
+     */
+    const debouncedUpdateSearchResults = debounce(() => {
+        const query = searchInput.value.trim().toLowerCase();
+
+        if (query.length < 2) {
+            searchResultsContainer.innerHTML = '';
+            searchResultsContainer.classList.add('hidden');
+            return;
+        }
+
+        // Filtra contra TODOS os dados
+        const filtered = allArticlesData.filter(d =>
+            d.title.toLowerCase().includes(query) ||
+            d.id.toLowerCase().includes(query) ||
+            d.category.toLowerCase().includes(query)
+        );
+
+        renderSearchResults(filtered);
+    }, 200); // Debounce de 200ms
+
+    function renderSearchResults(results) {
+        searchResultsContainer.innerHTML = '';
+
+        if (results.length === 0) {
+            // Estilização do resultado vazio
+            searchResultsContainer.innerHTML = '<p class="text-sm text-gray-500 p-2 text-center">Nenhum artigo corresponde à pesquisa. Use termos como "radiation" ou "bone".</p>';
+            searchResultsContainer.classList.remove('hidden');
+            return;
+        }
+
+        // Limita a 10 resultados
+        results.slice(0, 10).forEach(d => {
+            const resultItem = document.createElement('div');
+
+            // Estrutura de classe e conteúdo de duas linhas, conforme solicitado
+            resultItem.className = 'p-2 mb-1 cursor-pointer hover:bg-indigo-100 rounded-md transition duration-150 border-b border-gray-100 last:border-b-0';
+            resultItem.innerHTML = `
+                <p class="text-xs font-mono text-indigo-600">${d.id} - ${d.category}</p>
+                <p class="text-sm font-medium text-gray-800 line-clamp-2">${d.title}</p>
+            `;
+
+            resultItem.onclick = () => {
+                // Centraliza, dá zoom e seleciona o nó no mapa
+                centerAndSelectNode(d.id);
+                searchResultsContainer.classList.add('hidden');
+                searchInput.value = d.title; // Preenche o campo de busca
+                searchInput.blur();
+            };
+            searchResultsContainer.appendChild(resultItem);
+        });
+
+        searchResultsContainer.classList.remove('hidden');
+    }
+
+
+    /**
+     * Inicialização
+     */
+    window.onload = async () => {
+        // Inicializa o comportamento de Pan/Zoom
+        setupZoom();
+
+        // Carrega os dados, categoriza e configura a escala de cores/legenda
+        await fetchData();
+        renderLegendAndFilter();
+
+        // Renderiza o grafo inicial com todos os dados
+        renderGraph(allArticlesData);
+
+        // Adiciona listeners para pesquisa e filtro
+        // 1. Autocomplete (lista de resultados)
+        searchInput.addEventListener('input', debouncedUpdateSearchResults);
+        // 2. Filtragem do mapa (filtra o grafo enquanto digita)
+        searchInput.addEventListener('input', updateVisualization);
+        // 3. Filtragem e centralização do mapa (pelo dropdown e legenda)
+        categoryFilter.addEventListener('change', updateVisualization);
+    };
+
+</script>
+</body>
+</html>
