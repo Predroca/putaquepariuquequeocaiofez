@@ -1,0 +1,13 @@
+{
+  "name": "projeto-resumo-js-serverless",
+  "version": "1.0.0",
+  "description": "Busca e Resumo com Gemini usando Netlify Functions",
+  "main": "index.js",
+  "scripts": {
+    "start": "netlify dev"
+  },
+  "dependencies": {
+    "axios": "^1.6.8",
+    "@google/genai": "latest"
+  }
+}
